@@ -39,6 +39,12 @@
 #include "ullm/llama2.h"
 #include "util/log.h"
 
+#include <arm_neon.h>
+#include <dispatch/dispatch.h>
+
+#include <Accelerate/Accelerate.h>
+
+
 #define ULLM_LOG_TAG "ullm.llama2"
 
 static UllmStatus UllmLlama2MallocRunState(UllmLlama2Transformer* t) {
@@ -257,7 +263,7 @@ void matmul(float* xout, const float* x, const float* w, int n, int d) {
 
 #else
 
-void matmul(float* xout, const float* x, const float* w, int n, int d) {
+void matmul_C(float* xout, const float* x, const float* w, int n, int d) {
   // W (d,n) @ x (n,) -> xout (d,)
   const float* wptr = w;
   const float* wptr_end = &wptr[n * d];
@@ -272,6 +278,145 @@ void matmul(float* xout, const float* x, const float* w, int n, int d) {
     *xout++ = sum;
   }
 }
+
+
+void matmul_NEON(float* xout, const float* x, const float* w, int n, int d) {
+  const float* wptr = w;
+
+  for (int i = 0; i < d; ++i) {
+    float32x4_t vsum = vdupq_n_f32(0.0f); // Initialize NEON sum vector
+    int j = 0;
+
+    // Vectorized loop (process 4 floats at a time)
+    for (; j <= n - 4; j += 4) {
+      float32x4_t vx = vld1q_f32(&x[j]);             // Load 4 x values
+      float32x4_t vw = vld1q_f32(&wptr[i * n + j]);   // Load 4 weights
+      vsum = vmlaq_f32(vsum, vx, vw);                 // Multiply-accumulate
+    }
+
+    // Horizontal sum of the vector register
+    float32x2_t tmp = vadd_f32(vget_low_f32(vsum), vget_high_f32(vsum));
+    float sum = vget_lane_f32(tmp, 0) + vget_lane_f32(tmp, 1);
+
+    // Handle remainder (if n is not a multiple of 4)
+    for (; j < n; ++j) {
+      sum += x[j] * wptr[i * n + j];
+    }
+
+    xout[i] = sum;
+  }
+}
+
+void matmul_NEONMAX(float* xout, const float* x, const float* w, int n, int d) {
+  for (int i = 0; i < d; ++i) {
+    const float* wrow = &w[i * n];
+
+    float32x4_t vsum0 = vdupq_n_f32(0.0f);
+    float32x4_t vsum1 = vdupq_n_f32(0.0f);
+
+    int j = 0;
+    for (; j <= n - 8; j += 8) {
+      float32x4_t vx0 = vld1q_f32(&x[j]);
+      float32x4_t vw0 = vld1q_f32(&wrow[j]);
+      float32x4_t vx1 = vld1q_f32(&x[j + 4]);
+      float32x4_t vw1 = vld1q_f32(&wrow[j + 4]);
+
+      vsum0 = vmlaq_f32(vsum0, vx0, vw0);
+      vsum1 = vmlaq_f32(vsum1, vx1, vw1);
+    }
+
+    float32x4_t vsum = vaddq_f32(vsum0, vsum1);
+    float sum = vaddvq_f32(vsum); // Reduces all 4 lanes into one float
+
+    // Handle tail elements
+    for (; j < n; ++j) {
+      sum += x[j] * wrow[j];
+    }
+
+    xout[i] = sum;
+  }
+}
+
+void matmul_mt_dispatch(float* xout, const float* x, const float* w, int n, int d) {
+  dispatch_apply(d, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^(size_t i) {
+    const float* wrow = &w[i * n];
+
+    float32x4_t vsum0 = vdupq_n_f32(0.0f);
+    float32x4_t vsum1 = vdupq_n_f32(0.0f);
+
+    int j = 0;
+    for (; j <= n - 8; j += 8) {
+      float32x4_t vx0 = vld1q_f32(&x[j]);
+      float32x4_t vw0 = vld1q_f32(&wrow[j]);
+      float32x4_t vx1 = vld1q_f32(&x[j + 4]);
+      float32x4_t vw1 = vld1q_f32(&wrow[j + 4]);
+
+      vsum0 = vmlaq_f32(vsum0, vx0, vw0);
+      vsum1 = vmlaq_f32(vsum1, vx1, vw1);
+    }
+
+    float32x4_t vsum = vaddq_f32(vsum0, vsum1);
+    float sum = vaddvq_f32(vsum);
+
+    for (; j < n; ++j) {
+      sum += x[j] * wrow[j];
+    }
+
+    xout[i] = sum;
+  });
+}
+
+
+void matmul_accelerate(float* xout, const float* x, const float* w, int n, int d) {
+    // Computes: xout = W * x
+    // W is (d, n), x is (n), xout is (d)
+
+    cblas_sgemv(
+        CblasRowMajor,      // W is row-major (d x n)
+        CblasNoTrans,       // No transpose
+        d,                  // Number of rows of W
+        n,                  // Number of columns of W
+        1.0f,               // alpha
+        w,                  // Matrix W (row-major)
+        n,                  // Leading dimension of W
+        x,                  // Vector x
+        1,                  // Increment for x
+        0.0f,               // beta
+        xout,               // Result vector
+        1                   // Increment for xout
+    );
+}
+
+
+void matmul(float* y, const float* x, const float* w, int n, int d) {
+    for (int i = 0; i < d; ++i) {
+        const float* wrow = &w[i * n];
+        float32x4_t sum0 = vdupq_n_f32(0.0f);
+        float32x4_t sum1 = vdupq_n_f32(0.0f);
+
+        int j = 0;
+        for (; j <= n - 8; j += 8) {
+            float32x4_t vx0 = vld1q_f32(&x[j]);
+            float32x4_t vw0 = vld1q_f32(&wrow[j]);
+            sum0 = vmlaq_f32(sum0, vx0, vw0);
+
+            float32x4_t vx1 = vld1q_f32(&x[j + 4]);
+            float32x4_t vw1 = vld1q_f32(&wrow[j + 4]);
+            sum1 = vmlaq_f32(sum1, vx1, vw1);
+        }
+
+        float32x4_t sum = vaddq_f32(sum0, sum1);
+        float result = vaddvq_f32(sum); // horizontal add
+
+        // Tail handling
+        for (; j < n; ++j) {
+            result += x[j] * wrow[j];
+        }
+
+        y[i] = result;
+    }
+}
+
 
 #endif
 
