@@ -34,10 +34,17 @@ CFLAGS := \
     -I out/c-flags/lib \
     -std=c99 \
     -Wall \
-    -O$(OPT)
+    -O$(OPT) \
+    -O3 
 
 LDFLAGS := \
-    -lm
+    -lm -framework Accelerate
+
+
+
+
+
+
 
 .PHONY:
 all: $(BIN).elf
@@ -60,3 +67,8 @@ $(OUT)/%.o: %.c
 .PHONY:
 clean:
 	rm -rf $(OUT)
+
+
+test:
+	./out/ullm.elf -c out/stories15M.bin -t out/llama2.c/tokenizer.bin -p "The quick brown fox jumped. Where did he go?"
+	
