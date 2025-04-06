@@ -1,3 +1,9 @@
+#note
+
+this is just a fork of the awesome ullm code base, just so I can play with it and saving it for later.
+the ultimate goal is to make this work on an Atari ST (probably an emulated falcon with some DSP56k code for the matmul if I managed to find a cross compilator that'll produce working dsp code) :) 
+
+
 # ullm
 
 An effort to bring LLMs to very resource-constrained systems.
