@@ -98,3 +98,7 @@ clean:
 
 test:	all
 	./out/ullm.elf -c out/stories15M.bin -t out/llama2.c/tokenizer.bin -p "The quick brown fox jumped. Where did he go?"
+
+test_metal: metalcheck.c
+	clang -ObjC -framework Foundation -framework Metal -framework CoreGraphics metalcheck.c -o metalcheck
+	./metalcheck
