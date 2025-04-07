@@ -102,3 +102,9 @@ test:	all
 test_metal: metalcheck.c
 	clang -ObjC -framework Foundation -framework Metal -framework CoreGraphics metalcheck.c -o metalcheck
 	./metalcheck
+
+up_metal: 
+	pbpaste > ullm/matmul.metal
+
+up_metal_wrapper:
+	pbpaste > ullm/matmul_wrapper.mm
