@@ -1,8 +1,17 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 
+extern "C" void matmul_C(float* x, float* w, float* y, int n, int d);
+
+
 extern "C" void metal_matmul(float* x, float* w, float* y, int n, int d) {
     if (!x || !w || !y || n <= 0 || d <= 0) return;
+	if (d > 32768) {
+    	NSLog(@"⚠️ Falling back to CPU matmul for d=%d", d);
+    	matmul_C(y, x, w, n, d);
+    	return;
+	}
+
 
     id<MTLDevice> device = MTLCreateSystemDefaultDevice();
     if (!device) return;

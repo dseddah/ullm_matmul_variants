@@ -279,7 +279,7 @@ extern void matmul_shader_shared_memory(float* x, float* w, float* y, int n, int
 //#define matmul matmul_accelerate
 //#define matmul matmul_NEON_SIMD
 
-void matmul_C(float* xout, const float* x, const float* w, int n, int d) {
+__attribute__((visibility("default"))) void matmul_C(float* xout, const float* x, const float* w, int n, int d) {
   // W (d,n) @ x (n,) -> xout (d,)
   const float* wptr = w;
   const float* wptr_end = &wptr[n * d];
