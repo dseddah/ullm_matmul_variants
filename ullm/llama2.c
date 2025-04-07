@@ -20,7 +20,9 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
+ 
  */
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +45,7 @@
 #include <dispatch/dispatch.h>
 
 #include <Accelerate/Accelerate.h>
+#include <CoreGraphics/CoreGraphics.h>
 
 
 #define ULLM_LOG_TAG "ullm.llama2"
@@ -239,6 +242,7 @@ void softmax(float* x, int size) {
 
 #ifdef ULLM_ALTIVEC_ENABLED
 
+
 void matmul(float* xout, const float* x, const float* w, int n, int d) {
   // W (d,n) @ x (n,) -> xout (d,)
   const long addr_step = 4 * sizeof(float);
@@ -261,7 +265,19 @@ void matmul(float* xout, const float* x, const float* w, int n, int d) {
   }
 }
 
-#else
+#else    
+
+extern void metal_matmul(float* x, float* w, float* y, int n, int d);
+extern void matmul_shader_shared_memory(float* x, float* w, float* y, int n, int d);
+
+#define matmul metal_matmul
+//#define matmul matmul_shader_shared_memory
+
+//#define matmul matmul_NEON
+//#define matmul matmul_NEONMAX
+//#define matmul matmul_mt_dispatch
+//#define matmul matmul_accelerate
+//#define matmul matmul_NEON_SIMD
 
 void matmul_C(float* xout, const float* x, const float* w, int n, int d) {
   // W (d,n) @ x (n,) -> xout (d,)
@@ -388,7 +404,7 @@ void matmul_accelerate(float* xout, const float* x, const float* w, int n, int d
 }
 
 
-void matmul(float* y, const float* x, const float* w, int n, int d) {
+void matmul_NEON_SIMD(float* y, const float* x, const float* w, int n, int d) {
     for (int i = 0; i < d; ++i) {
         const float* wrow = &w[i * n];
         float32x4_t sum0 = vdupq_n_f32(0.0f);

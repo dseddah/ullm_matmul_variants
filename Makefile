@@ -7,6 +7,7 @@ SRCS := \
     $(OUT)/c-flags/lib/string-view.c \
     ullm/llama2.c \
     ullm/matmul_wrapper.mm \
+    ullm/matmul_shared_wrapper.mm \
     util/log.c \
     util/status.c \
     sys/file.c \
@@ -42,7 +43,8 @@ LDFLAGS := \
     -lm \
     -framework Accelerate \
     -framework Metal \
-    -framework Foundation
+    -framework Foundation \
+    -framework CoreGraphics
 
 .PHONY:
 all: $(BIN).elf
@@ -53,9 +55,9 @@ fetchdeps:
 	@mkdir -p $(OUT)
 	cd $(OUT); git clone https://github.com/DieTime/c-flags.git
 	cd $(OUT); git clone https://github.com/karpathy/llama2.c.git
-	cd $(OUT); curl -L -O https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin
+#	cd $(OUT); curl -L -O https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin
 
-$(BIN).elf: ullm/matmul.metallib $(OBJS)
+$(BIN).elf: out/matmul.metallib out/matmul_shared.metallib $(OBJS)
 	clang++ $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
 # Compile C files
@@ -70,12 +72,29 @@ $(OUT)/%.o: %.mm
 
 # Compile Metal shader
 ullm/matmul.metallib: ullm/matmul.metal
-	xcrun -sdk macosx metal -c -o ullm/matmul.air $<
-	xcrun -sdk macosx metallib -o $@ ullm/matmul.air
+	xcrun -sdk macosx metal -c -o out/matmul.air $<
+	xcrun -sdk macosx metallib -o $@ out/matmul.air
+
+
+	
+ullm/matmul_shared.metallib: ullm/matmul_shared.metal
+	xcrun -sdk macosx metal -c -o out/matmul_shared.air $<
+	xcrun -sdk macosx metallib -o $@ out/matmul_shared.air
+
+
+out/matmul.metallib: ullm/matmul.metal
+	xcrun -sdk macosx metal -c -o out/matmul.air $<
+	xcrun -sdk macosx metallib -o $@ out/matmul.air
+out/matmul_shared.metallib: ullm/matmul_shared.metal
+	xcrun -sdk macosx metal -c -o out/matmul_shared.air $<
+	xcrun -sdk macosx metallib -o $@ out/matmul_shared.air
+
+
+
 
 .PHONY:
 clean:
-	rm -rf $(OUT) ullm/*.air ullm/*.metallib
+	rm -rf ./out/ullm.elf ullm/*.air ullm/*.metallib out/*.air out/*.metallib
 
-test:
+test:	all
 	./out/ullm.elf -c out/stories15M.bin -t out/llama2.c/tokenizer.bin -p "The quick brown fox jumped. Where did he go?"
