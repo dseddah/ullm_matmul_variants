@@ -9,9 +9,9 @@ kernel void matmul_vec(const device float* W [[ buffer(0) ]],
                        uint id [[ thread_position_in_grid ]]) {
     if (id >= d) return;
 
-    float sum = 0.0;
+    float sum = 0.0f;
     for (uint j = 0; j < n; ++j) {
-        sum += W[id * n + j] * x[j];
+        sum += W[id * n + j] * x[j]; // W is (d x n), row-major
     }
     y[id] = sum;
 }

@@ -270,13 +270,13 @@ void matmul(float* xout, const float* x, const float* w, int n, int d) {
 extern void metal_matmul(float* x, float* w, float* y, int n, int d);
 extern void matmul_shader_shared_memory(float* x, float* w, float* y, int n, int d);
 
-#define matmul metal_matmul
+//#define matmul metal_matmul
 //#define matmul matmul_shader_shared_memory
 
 //#define matmul matmul_NEON
 //#define matmul matmul_NEONMAX
 //#define matmul matmul_mt_dispatch
-//#define matmul matmul_accelerate
+#define matmul matmul_accelerate
 //#define matmul matmul_NEON_SIMD
 
 __attribute__((visibility("default"))) void matmul_C(float* xout, const float* x, const float* w, int n, int d) {
