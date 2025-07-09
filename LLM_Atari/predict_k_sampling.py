@@ -3,25 +3,32 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import argparse
+import json
 
-# === 0. Argument parser for k ===
-parser = argparse.ArgumentParser(description="Micro LLM Top-k Sampler")
+# === 0. CLI arguments ===
+parser = argparse.ArgumentParser(description="Micro LLM Top-k Sampler with config loading.")
 parser.add_argument("--k", type=int, default=5, help="Top-k sampling value (default: 5)")
+parser.add_argument("--prompt", type=str, default="the cat", help="Prompt for generation (default: 'the cat')")
+parser.add_argument("--generate", type=int, default=300, help="Number of characters to generate (default: 300)")
 args = parser.parse_args()
 top_k = args.k
+prompt = args.prompt
+num_generate = args.generate
 
-# === 1. Explicit vocab and mapping ===
-vocab_list = list("abcdefghijklmnopqrstuvwxyz .,!?")
-vocab_size = len(vocab_list)
+# === 1. Load config ===
+with open("tiny_llm_config.json", "r") as f:
+    config = json.load(f)
+
+hidden_size = config["hidden_size"]
+num_layers = config["num_layers"]
+num_heads = config["num_heads"]
+seq_len = config["seq_len"]
+vocab_list = config["vocab_list"]
+vocab_size = config["vocab_size"]
 char_to_idx = {ch: i for i, ch in enumerate(vocab_list)}
 idx_to_char = {i: ch for i, ch in enumerate(vocab_list)}
 
-# === 2. Model definition matching your training ===
-hidden_size = 32
-num_layers = 1
-num_heads = 1
-seq_len = 32
-
+# === 2. Model definition ===
 class TinyGPT(nn.Module):
     def __init__(self):
         super().__init__()
@@ -48,19 +55,16 @@ with open("tiny_llm_weights.bin", "rb") as f:
 model.load_state_dict(state_dict)
 model.eval()
 
-print(f"✅ Weights loaded successfully. Using top-k = {top_k}")
+print(f"✅ Weights and config loaded successfully. Using top-k = {top_k}")
 
-# === 4. Top-k Sampling Helper ===
+# === 4. Top-k Sampling ===
 def top_k_sampling(logits, k=5):
     values, indices = torch.topk(logits, k)
     probs = F.softmax(values, dim=0)
     idx = torch.multinomial(probs, num_samples=1)
     return indices[idx].item()
 
-# === 5. Generation loop ===
-prompt = "the cat"
-num_generate = 300  # characters to generate
-
+# === 5. Generation ===
 context = [char_to_idx.get(ch, char_to_idx[' ']) for ch in prompt.lower()]
 context = torch.tensor(context, dtype=torch.long).unsqueeze(1)  # [seq_len, batch]
 
@@ -79,4 +83,4 @@ for _ in range(num_generate):
     context = torch.cat([context, torch.tensor([[next_idx]], dtype=torch.long)], dim=0)
     print(idx_to_char[next_idx], end='', flush=True)
 
-print("\n\n✅ Generation complete using top-k sampling.")
+print("\n\n✅ Generation complete with top-k sampling.")
