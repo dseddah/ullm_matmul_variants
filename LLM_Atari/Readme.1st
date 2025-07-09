@@ -1,0 +1,3 @@
+make train ARGS="--hidden_size 48 --num_layers 2 --num_heads 2 --seq_len 32 --epochs 1500"
+
+make predict ARGS="--k 8 --prompt 'once upon a' --generate 500"
