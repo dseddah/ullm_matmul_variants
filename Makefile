@@ -29,6 +29,7 @@ OBJS := $(patsubst %.c, $(OUT)/%.o, $(filter %.c, $(SRCS))) \
 CFLAGS := \
     -I . \
     -I out/c-flags/lib \
+    -I /opt/homebrew/opt/libomp/include
     -std=c99 \
     -Wall \
     -O$(OPT)
@@ -44,7 +45,8 @@ LDFLAGS := \
     -framework Accelerate \
     -framework Metal \
     -framework Foundation \
-    -framework CoreGraphics
+    -framework CoreGraphics \
+    -L/opt/homebrew/opt/libomp/lib
 
 .PHONY:
 all: $(BIN).elf

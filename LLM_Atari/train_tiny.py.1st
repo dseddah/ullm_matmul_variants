@@ -1,0 +1,65 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+
+# Hyperparameters
+vocab_size = 64  # ASCII subset
+hidden_size = 32
+num_layers = 1
+num_heads = 1
+seq_len = 32
+
+class TinyGPT(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.token_embedding = nn.Embedding(vocab_size, hidden_size)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads)
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.lm_head = nn.Linear(hidden_size, vocab_size)
+
+    def forward(self, x):
+        x = self.token_embedding(x) * (hidden_size ** 0.5)
+        x = self.transformer(x)
+        return self.lm_head(x)
+
+# Generate dummy dataset
+#text = "the quick brown fox jumps over the lazy dog. "
+with open("train_tiny.txt", "r") as f:
+    text = f.read().lower()
+
+chars = sorted(list(set(text)))
+char_to_idx = {ch: i for i, ch in enumerate(chars)}
+idx_to_char = {i: ch for ch, i in char_to_idx.items()}
+data = torch.tensor([char_to_idx[c] for c in text * 100], dtype=torch.long)
+
+# Model
+model = TinyGPT()
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+# Training loop
+for epoch in range(500):
+    idx = torch.randint(0, len(data) - seq_len - 1, (1,))
+    seq = data[idx:idx + seq_len]
+    target = data[idx + 1:idx + seq_len + 1]
+    seq = seq.unsqueeze(1)  # [seq_len, batch]
+    target = target.unsqueeze(1)
+    optimizer.zero_grad()
+    output = model(seq)
+    loss = F.cross_entropy(output.view(-1, vocab_size), target.view(-1))
+    loss.backward()
+    optimizer.step()
+    if epoch % 50 == 0:
+        print(f"Epoch {epoch}, Loss: {loss.item():.4f}")
+
+# Quantization and export
+def quantize_tensor(tensor):
+    return (tensor * 127).clamp(-128, 127).to(torch.int8)
+
+state_dict = model.state_dict()
+with open("tiny_llm_weights.bin", "wb") as f:
+    for k, v in state_dict.items():
+        q = quantize_tensor(v.cpu().flatten())
+        q.numpy().tofile(f)
+
+print("Exported quantized weights to tiny_llm_weights.bin")
