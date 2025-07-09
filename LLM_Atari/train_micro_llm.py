@@ -1,32 +1,43 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import argparse
+import json
 
-# === 1. Explicit Tiny vocab ===
+# === 0. Argument parsing ===
+parser = argparse.ArgumentParser(description="Train Micro LLM with exportable quantized weights and config.")
+parser.add_argument("--hidden_size", type=int, default=32, help="Hidden size (default: 32)")
+parser.add_argument("--num_layers", type=int, default=1, help="Number of transformer layers (default: 1)")
+parser.add_argument("--num_heads", type=int, default=1, help="Number of attention heads (default: 1)")
+parser.add_argument("--seq_len", type=int, default=32, help="Sequence length (default: 32)")
+parser.add_argument("--epochs", type=int, default=1000, help="Number of training epochs (default: 1000)")
+args = parser.parse_args()
+
+hidden_size = args.hidden_size
+num_layers = args.num_layers
+num_heads = args.num_heads
+seq_len = args.seq_len
+epochs = args.epochs
+
+# === 1. Vocab definition ===
 vocab_list = list("abcdefghijklmnopqrstuvwxyz .,!?")
 vocab_size = len(vocab_list)
 char_to_idx = {ch: i for i, ch in enumerate(vocab_list)}
 idx_to_char = {i: ch for i, ch in enumerate(vocab_list)}
 
-# === 2. Load training and validation text ===
+# === 2. Load data ===
 with open("train_tiny.txt", "r") as f:
     raw_train_text = f.read().lower()
 with open("val_tiny.txt", "r") as f:
     raw_val_text = f.read().lower()
 
-# Filter to allowed characters only
 train_text = ''.join([ch if ch in char_to_idx else ' ' for ch in raw_train_text])
 val_text = ''.join([ch if ch in char_to_idx else ' ' for ch in raw_val_text])
 
 train_data = torch.tensor([char_to_idx[c] for c in train_text], dtype=torch.long)
 val_data = torch.tensor([char_to_idx[c] for c in val_text], dtype=torch.long)
 
-# === 3. TinyGPT definition ===
-hidden_size = 48
-num_layers = 2
-num_heads = 2
-seq_len = 32
-
+# === 3. Model definition ===
 class TinyGPT(nn.Module):
     def __init__(self):
         super().__init__()
@@ -43,13 +54,12 @@ class TinyGPT(nn.Module):
 model = TinyGPT()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-# === 4. Training Loop ===
-batch_size = 1  # For simplicity
-epochs = 10000
+# === 4. Training loop ===
+batch_size = 1
 
 for epoch in range(epochs):
     idx = torch.randint(0, len(train_data) - seq_len - 1, (batch_size,))
-    seq = torch.stack([train_data[i:i+seq_len] for i in idx]).transpose(0,1)  # [seq_len, batch]
+    seq = torch.stack([train_data[i:i+seq_len] for i in idx]).transpose(0,1)
     target = torch.stack([train_data[i+1:i+seq_len+1] for i in idx]).transpose(0,1)
 
     optimizer.zero_grad()
@@ -67,9 +77,9 @@ for epoch in range(epochs):
             val_loss = F.cross_entropy(val_output.view(-1, vocab_size), val_target.reshape(-1))
         print(f"Epoch {epoch}, Train Loss: {loss.item():.4f}, Val Loss: {val_loss.item():.4f}")
 
-# === 5. Quantization and Export ===
+# === 5. Quantization and export ===
 def quantize_tensor(tensor):
-    tensor = tensor.clamp(-1, 1)  # safety
+    tensor = tensor.clamp(-1, 1)
     tensor = (tensor * 127).round().clamp(-128, 127).to(torch.int8)
     return tensor
 
@@ -79,4 +89,18 @@ with open("tiny_llm_weights.bin", "wb") as f:
         q = quantize_tensor(v.cpu().flatten())
         q.numpy().tofile(f)
 
-print(f"\n✅ Export complete: tiny_llm_weights.bin ({sum(v.numel() for v in state_dict.values())} params)")
+print("\n✅ Export complete: tiny_llm_weights.bin")
+
+# === 6. Write config ===
+config = {
+    "hidden_size": hidden_size,
+    "num_layers": num_layers,
+    "num_heads": num_heads,
+    "seq_len": seq_len,
+    "vocab_list": vocab_list,
+    "vocab_size": vocab_size
+}
+with open("tiny_llm_config.json", "w") as f:
+    json.dump(config, f, indent=2)
+
+print("✅ Config saved to tiny_llm_config.json")
