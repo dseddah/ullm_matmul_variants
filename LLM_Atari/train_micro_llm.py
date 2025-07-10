@@ -5,7 +5,7 @@ import argparse
 import json
 
 # === 0. Argument parsing ===
-parser = argparse.ArgumentParser(description="Train Micro LLM with exportable quantized weights and config.")
+parser = argparse.ArgumentParser(description="Train Micro LLM with quantized export and config (with positional embeddings).")
 parser.add_argument("--hidden_size", type=int, default=32, help="Hidden size (default: 32)")
 parser.add_argument("--num_layers", type=int, default=1, help="Number of transformer layers (default: 1)")
 parser.add_argument("--num_heads", type=int, default=1, help="Number of attention heads (default: 1)")
@@ -26,9 +26,9 @@ char_to_idx = {ch: i for i, ch in enumerate(vocab_list)}
 idx_to_char = {i: ch for i, ch in enumerate(vocab_list)}
 
 # === 2. Load data ===
-with open("train_10.txt", "r") as f:
+with open("train_tiny.txt", "r") as f:
     raw_train_text = f.read().lower()
-with open("train_10.txt", "r") as f:
+with open("val_tiny.txt", "r") as f:
     raw_val_text = f.read().lower()
 
 train_text = ''.join([ch if ch in char_to_idx else ' ' for ch in raw_train_text])
@@ -37,17 +37,20 @@ val_text = ''.join([ch if ch in char_to_idx else ' ' for ch in raw_val_text])
 train_data = torch.tensor([char_to_idx[c] for c in train_text], dtype=torch.long)
 val_data = torch.tensor([char_to_idx[c] for c in val_text], dtype=torch.long)
 
-# === 3. Model definition ===
+# === 3. Model definition (with positional embeddings) ===
 class TinyGPT(nn.Module):
     def __init__(self):
         super().__init__()
         self.token_embedding = nn.Embedding(vocab_size, hidden_size)
+        self.pos_embedding = nn.Embedding(seq_len, hidden_size)
         encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.lm_head = nn.Linear(hidden_size, vocab_size)
 
     def forward(self, x):
-        x = self.token_embedding(x) * (hidden_size ** 0.5)
+        positions = torch.arange(0, x.size(0), device=x.device).unsqueeze(1)  # [seq_len, 1]
+        x = self.token_embedding(x) + self.pos_embedding(positions)
+        x = x * (hidden_size ** 0.5)
         x = self.transformer(x)
         return self.lm_head(x)
 
@@ -75,7 +78,7 @@ for epoch in range(epochs):
             val_target = torch.stack([val_data[i+1:i+seq_len+1] for i in val_idx]).transpose(0,1)
             val_output = model(val_seq)
             val_loss = F.cross_entropy(val_output.view(-1, vocab_size), val_target.reshape(-1))
-        print(f"Epoch {epoch}, Train Loss: {loss.item():.4f}, Val Loss: {val_loss.item():.4f}")
+        print(f"Epoch {epoch}, Train Loss: {loss.item():.6f}, Val Loss: {val_loss.item():.6f}")
 
 # === 5. Quantization and export ===
 def quantize_tensor(tensor):
@@ -91,17 +94,15 @@ with open("tiny_llm_weights.bin", "wb") as f:
 
 print("\n✅ Export complete: tiny_llm_weights.bin")
 
-# === Parameter count and size reporting ===
+# === Parameter count & size ===
 param_count = sum(p.numel() for p in model.parameters())
-param_size_bytes = param_count * 1  # int8 = 1 byte per parameter
+param_size_bytes = param_count
 param_size_mb = param_size_bytes / (1024 * 1024)
 
-print(f"\n📊 Model parameters: {param_count:,} params")
+print(f"📊 Model parameters: {param_count:,} params")
 print(f"📦 Model size: {param_size_bytes:,} bytes ({param_size_mb:.4f} MB)\n")
 
-
-
-# === 6. Write config ===
+# === 6. Save config ===
 config = {
     "hidden_size": hidden_size,
     "num_layers": num_layers,

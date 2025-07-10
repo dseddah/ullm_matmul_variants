@@ -34,17 +34,20 @@ seq_len = 32
 epochs = 1000
 lr = 3e-3
 
-# === Model definition ===
+# === Model definition with positional embeddings ===
 class TinyGPT(nn.Module):
     def __init__(self):
         super().__init__()
         self.token_embedding = nn.Embedding(vocab_size, hidden_size)
+        self.pos_embedding = nn.Embedding(seq_len, hidden_size)
         encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.lm_head = nn.Linear(hidden_size, vocab_size)
 
     def forward(self, x):
-        x = self.token_embedding(x) * (hidden_size ** 0.5)
+        positions = torch.arange(0, x.size(0), device=x.device).unsqueeze(1)  # [seq_len, 1]
+        x = self.token_embedding(x) + self.pos_embedding(positions)
+        x = x * (hidden_size ** 0.5)
         x = self.transformer(x)
         return self.lm_head(x)
 
@@ -53,10 +56,9 @@ optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 # === Overfit training loop ===
 for epoch in range(epochs):
-    # Always train on the same slice for deterministic overfit testing
     if len(data) < seq_len + 1:
         raise ValueError("Text too short for seq_len, reduce seq_len or use longer text.")
-    seq = data[:seq_len].unsqueeze(1)      # [seq_len, 1]
+    seq = data[:seq_len].unsqueeze(1)       # [seq_len, 1]
     target = data[1:seq_len+1].unsqueeze(1) # [seq_len, 1]
 
     optimizer.zero_grad()
@@ -66,7 +68,7 @@ for epoch in range(epochs):
     optimizer.step()
 
     if epoch % 10 == 0:
-        print(f"Epoch {epoch}, Loss: {loss.item():.4f}")
+        print(f"Epoch {epoch}, Loss: {loss.item():.6f}")
 
 # === Quantize and export weights ===
 def quantize_tensor(tensor):
