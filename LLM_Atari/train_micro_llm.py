@@ -26,9 +26,9 @@ char_to_idx = {ch: i for i, ch in enumerate(vocab_list)}
 idx_to_char = {i: ch for i, ch in enumerate(vocab_list)}
 
 # === 2. Load data ===
-with open("train_tiny.txt", "r") as f:
+with open("train_10.txt", "r") as f:
     raw_train_text = f.read().lower()
-with open("val_tiny.txt", "r") as f:
+with open("train_10.txt", "r") as f:
     raw_val_text = f.read().lower()
 
 train_text = ''.join([ch if ch in char_to_idx else ' ' for ch in raw_train_text])
@@ -90,6 +90,16 @@ with open("tiny_llm_weights.bin", "wb") as f:
         q.numpy().tofile(f)
 
 print("\n✅ Export complete: tiny_llm_weights.bin")
+
+# === Parameter count and size reporting ===
+param_count = sum(p.numel() for p in model.parameters())
+param_size_bytes = param_count * 1  # int8 = 1 byte per parameter
+param_size_mb = param_size_bytes / (1024 * 1024)
+
+print(f"\n📊 Model parameters: {param_count:,} params")
+print(f"📦 Model size: {param_size_bytes:,} bytes ({param_size_mb:.4f} MB)\n")
+
+
 
 # === 6. Write config ===
 config = {
