@@ -11,6 +11,8 @@ parser.add_argument("--num_layers", type=int, default=1, help="Number of transfo
 parser.add_argument("--num_heads", type=int, default=1, help="Number of attention heads (default: 1)")
 parser.add_argument("--seq_len", type=int, default=32, help="Sequence length (default: 32)")
 parser.add_argument("--epochs", type=int, default=1000, help="Number of training epochs (default: 1000)")
+parser.add_argument("--train_file", type=str, default="train_tiny.txt", help="Training text file (default: train_tiny.txt)")
+parser.add_argument("--val_file", type=str, default="val_tiny.txt", help="Validation text file (default: val_tiny.txt)")
 args = parser.parse_args()
 
 hidden_size = args.hidden_size
@@ -18,6 +20,8 @@ num_layers = args.num_layers
 num_heads = args.num_heads
 seq_len = args.seq_len
 epochs = args.epochs
+train_file = args.train_file
+val_file = args.val_file
 
 # === 1. Vocab definition ===
 vocab_list = list("abcdefghijklmnopqrstuvwxyz .,!?")
@@ -26,9 +30,9 @@ char_to_idx = {ch: i for i, ch in enumerate(vocab_list)}
 idx_to_char = {i: ch for i, ch in enumerate(vocab_list)}
 
 # === 2. Load data ===
-with open("train_tiny.txt", "r") as f:
+with open(train_file, "r") as f:
     raw_train_text = f.read().lower()
-with open("val_tiny.txt", "r") as f:
+with open(val_file, "r") as f:
     raw_val_text = f.read().lower()
 
 train_text = ''.join([ch if ch in char_to_idx else ' ' for ch in raw_train_text])
@@ -109,9 +113,11 @@ config = {
     "num_heads": num_heads,
     "seq_len": seq_len,
     "vocab_list": vocab_list,
-    "vocab_size": vocab_size
+    "vocab_size": vocab_size,
+    "train_file": train_file,
+    "val_file": val_file
 }
 with open("tiny_llm_config.json", "w") as f:
     json.dump(config, f, indent=2)
 
-print("✅ Config saved to tiny_llm_config.json")
+print(f"✅ Config saved to tiny_llm_config.json, including training and validation file paths.")
