@@ -4,10 +4,13 @@ import torch.nn.functional as F
 import json
 import argparse
 
+# === Argument parsing ===
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_name", type=str, default="tiny_llm", help="Base name for model files (default: tiny_llm)")
+parser.add_argument("--lr", type=float, default=3e-3, help="Learning rate (default: 0.003)")
 args = parser.parse_args()
 model_name = args.model_name
+lr = args.lr
 
 # === Tiny test corpus ===
 text = """
@@ -36,7 +39,6 @@ num_layers = 1
 num_heads = 1
 seq_len = 32
 epochs = 1000
-lr = 3e-3
 
 class TinyGPT(nn.Module):
     def __init__(self):
@@ -70,6 +72,7 @@ for epoch in range(epochs):
     if epoch % 10 == 0:
         print(f"Epoch {epoch}, Loss: {loss.item():.6f}")
 
+# === Export weights ===
 def quantize_tensor(tensor):
     tensor = tensor.clamp(-1, 1)
     tensor = (tensor * 127).round().clamp(-128, 127).to(torch.int8)
@@ -90,6 +93,7 @@ param_size_mb = param_size_bytes / (1024 * 1024)
 print(f"📊 Model parameters: {param_count:,}")
 print(f"📦 Model size: {param_size_bytes:,} bytes ({param_size_mb:.4f} MB)")
 
+# === Save config ===
 config = {
     "hidden_size": hidden_size,
     "num_layers": num_layers,
@@ -98,7 +102,8 @@ config = {
     "vocab_list": vocab_list,
     "vocab_size": vocab_size,
     "train_file": "[inline tiny corpus]",
-    "val_file": "[inline tiny corpus]"
+    "val_file": "[inline tiny corpus]",
+    "learning_rate": lr
 }
 with open(f"{model_name}_config.json", "w") as f:
     json.dump(config, f, indent=2)
