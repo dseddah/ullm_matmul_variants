@@ -5,7 +5,7 @@ import numpy as np
 import argparse
 import json
 import os
-
+ 
 # === 0. CLI arguments ===
 parser = argparse.ArgumentParser(description="Micro LLM Top-k Sampler with positional generation.")
 parser.add_argument("--k", type=int, default=1, help="Top-k sampling value (default: 1)")
