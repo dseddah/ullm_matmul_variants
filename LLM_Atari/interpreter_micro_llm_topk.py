@@ -4,19 +4,31 @@ import torch.nn.functional as F
 import numpy as np
 import argparse
 import json
+import os
 
 # === 0. CLI arguments ===
 parser = argparse.ArgumentParser(description="Micro LLM Top-k Sampler with positional generation.")
-parser.add_argument("--k", type=int, default=1, help="Top-k sampling value (default: 1 for overfit testing)")
+parser.add_argument("--k", type=int, default=1, help="Top-k sampling value (default: 1)")
 parser.add_argument("--prompt", type=str, default="the ", help="Prompt for generation (default: 'the ')")
 parser.add_argument("--generate", type=int, default=200, help="Number of characters to generate (default: 200)")
+parser.add_argument("--model_name", type=str, default="tiny_llm", help="Base name of model (default: tiny_llm)")
 args = parser.parse_args()
+
 top_k = args.k
 prompt = args.prompt
 num_generate = args.generate
+model_name = args.model_name
 
-# === 1. Load config ===
-with open("tiny_llm_config.json", "r") as f:
+# === 1. Load config and vocab ===
+config_file = f"{model_name}_config.json"
+weights_file = f"{model_name}_weights.bin"
+
+if not os.path.exists(config_file):
+    raise FileNotFoundError(f"❌ Config file not found: {config_file}")
+if not os.path.exists(weights_file):
+    raise FileNotFoundError(f"❌ Weights file not found: {weights_file}")
+
+with open(config_file, "r") as f:
     config = json.load(f)
 
 hidden_size = config["hidden_size"]
@@ -28,7 +40,7 @@ vocab_size = config["vocab_size"]
 char_to_idx = {ch: i for i, ch in enumerate(vocab_list)}
 idx_to_char = {i: ch for i, ch in enumerate(vocab_list)}
 
-# === 2. Model definition with positional handling ===
+# === 2. Model definition ===
 class TinyGPT(nn.Module):
     def __init__(self):
         super().__init__()
@@ -49,7 +61,7 @@ model = TinyGPT()
 
 # === 3. Load quantized weights ===
 state_dict = model.state_dict()
-with open("tiny_llm_weights.bin", "rb") as f:
+with open(weights_file, "rb") as f:
     for k in state_dict.keys():
         numel = state_dict[k].numel()
         q = np.frombuffer(f.read(numel), dtype=np.int8).astype(np.float32) / 127.0
@@ -58,22 +70,24 @@ with open("tiny_llm_weights.bin", "rb") as f:
 model.load_state_dict(state_dict)
 model.eval()
 
-print(f"✅ Weights and config loaded successfully. Using top-k = {top_k}")
+print(f"✅ Loaded model: {model_name}")
+print(f"📚 Prompt: '{prompt}' | 🧠 top-k: {top_k} | ✏️ generate: {num_generate} tokens")
 
-# === 4. Top-k Sampling ===
+# === 4. Sampling function ===
 def top_k_sampling(logits, k=1):
     values, indices = torch.topk(logits, k)
     probs = F.softmax(values, dim=0)
     idx = torch.multinomial(probs, num_samples=1)
     return indices[idx].item()
 
-# === 5. Generation ===
+# === 5. Encode prompt ===
 context = [char_to_idx.get(ch, char_to_idx[' ']) for ch in prompt.lower()]
-context = torch.tensor(context, dtype=torch.long).unsqueeze(1)  # [seq_len, batch]
+context = torch.tensor(context, dtype=torch.long).unsqueeze(1)  # shape: [seq, 1]
 
-print(f"\n🌱 Prompt: {prompt}\n")
+print("\n🌱 Generating:\n")
 print(prompt, end='', flush=True)
 
+# === 6. Generation loop ===
 for step in range(num_generate):
     input_seq = context[-seq_len:] if context.shape[0] >= seq_len else \
                 torch.cat([torch.zeros(seq_len - context.shape[0], 1, dtype=torch.long), context], dim=0)
@@ -86,4 +100,4 @@ for step in range(num_generate):
     context = torch.cat([context, torch.tensor([[next_idx]], dtype=torch.long)], dim=0)
     print(idx_to_char[next_idx], end='', flush=True)
 
-print("\n\n✅ Generation complete.")
+print("\n\n✅ Done.")
