@@ -16,6 +16,7 @@ parser.add_argument("--num_heads", type=int, default=1, help="Number of attentio
 parser.add_argument("--seq_len", type=int, default=32, help="Sequence length (default: 32)")
 parser.add_argument("--epochs", type=int, default=1000, help="Number of training epochs (default: 1000)")
 parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate (default: 1e-3)")
+parser.add_argument("--debug", action="store_true", help="Enable debug output during training")
 args = parser.parse_args()
 
 # === 1. Hyperparams ===
@@ -26,6 +27,7 @@ num_heads = args.num_heads
 seq_len = args.seq_len
 epochs = args.epochs
 lr = args.lr
+debug = args.debug
 
 # === 2. Vocab ===
 vocab_list = list("abcdefghijklmnopqrstuvwxyz .,!?")
@@ -86,6 +88,14 @@ for epoch in range(epochs):
             val_output = model(val_seq)
             val_loss = F.cross_entropy(val_output.view(-1, vocab_size), val_target.reshape(-1))
         print(f"Epoch {epoch}, Train Loss: {loss.item():.6f}, Val Loss: {val_loss.item():.6f}")
+
+        if debug:
+            sample_input = ''.join(idx_to_char[i.item()] for i in seq[:, 0])
+            sample_target = ''.join(idx_to_char[i.item()] for i in target[:, 0])
+            print(f"🧪 Input sample:  {sample_input}")
+            print(f"🎯 Target sample: {sample_target}")
+            print(f"🔍 Embedding[0]: {model.token_embedding.weight[0][:5].detach().cpu().numpy()}")
+            print()
 
 # === 6. Quantized export ===
 def quantize_tensor(tensor):
