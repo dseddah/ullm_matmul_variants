@@ -12,12 +12,14 @@ parser.add_argument("--k", type=int, default=1, help="Top-k sampling value (defa
 parser.add_argument("--prompt", type=str, default="the ", help="Prompt for generation (default: 'the ')")
 parser.add_argument("--generate", type=int, default=200, help="Number of characters to generate (default: 200)")
 parser.add_argument("--model_name", type=str, default="tiny_llm", help="Base name of model (default: tiny_llm)")
+parser.add_argument("--debug", action="store_true", help="Enable debug output during generation")
 args = parser.parse_args()
 
 top_k = args.k
 prompt = args.prompt
 num_generate = args.generate
 model_name = args.model_name
+debug = args.debug
 
 # === 1. Load config and vocab ===
 config_file = f"{model_name}_config.json"
@@ -78,7 +80,7 @@ def top_k_sampling(logits, k=1):
     values, indices = torch.topk(logits, k)
     probs = F.softmax(values, dim=0)
     idx = torch.multinomial(probs, num_samples=1)
-    return indices[idx].item()
+    return indices[idx].item(), indices, probs
 
 # === 5. Encode prompt ===
 context = [char_to_idx.get(ch, char_to_idx[' ']) for ch in prompt.lower()]
@@ -92,10 +94,26 @@ for step in range(num_generate):
     input_seq = context[-seq_len:] if context.shape[0] >= seq_len else \
                 torch.cat([torch.zeros(seq_len - context.shape[0], 1, dtype=torch.long), context], dim=0)
 
+    start_pos = context.shape[0] - seq_len
+
     with torch.no_grad():
-        logits = model(input_seq, start_pos=context.shape[0] - seq_len)
+        logits = model(input_seq, start_pos=start_pos)
         next_logits = logits[-1, 0, :]
-        next_idx = top_k_sampling(next_logits, k=top_k)
+
+        if debug:
+            print(f"\n--- Step {step} ---")
+            print("Start pos:", start_pos)
+            print("Input seq:", ''.join(idx_to_char[i.item()] for i in input_seq.squeeze()))
+            print("Logits max/min:", next_logits.max().item(), next_logits.min().item())
+
+        next_idx, top_indices, top_probs = top_k_sampling(next_logits, k=top_k)
+
+        if debug and step < 5:
+            print(f"Top-{top_k} tokens:")
+            for rank in range(top_k):
+                ch = idx_to_char[top_indices[rank].item()]
+                p = top_probs[rank].item()
+                print(f"  {rank+1}: '{ch}' ({p:.4f})")
 
     context = torch.cat([context, torch.tensor([[next_idx]], dtype=torch.long)], dim=0)
     print(idx_to_char[next_idx], end='', flush=True)

@@ -26,7 +26,49 @@ tom smiled.
 anna danced.
 birds sang.
 trees swayed.
+the cat sat.
+the dog ran.
+the fox jumped.
+the sun rose.
+the moon shone.
+lila laughed.
+tom smiled.
+anna danced.
+birds sang.
+trees swayed.
+the cat sat.
+the dog ran.
+the fox jumped.
+the sun rose.
+the moon shone.
+lila laughed.
+tom smiled.
+anna danced.
+birds sang.
+trees swayed.
+the cat sat.
+the dog ran.
+the fox jumped.
+the sun rose.
+the moon shone.
+lila laughed.
+tom smiled.
+anna danced.
+birds sang.
+trees swayed.
+the cat sat.
+the dog ran.
+the fox jumped.
+the sun rose.
+the moon shone.
+lila laughed.
+tom smiled.
+anna danced.
+birds sang.
+trees swayed.
 """.strip().lower()
+
+
 
 vocab_list = list("abcdefghijklmnopqrstuvwxyz .,!?")
 vocab_size = len(vocab_list)
@@ -36,10 +78,10 @@ idx_to_char = {i: ch for i, ch in enumerate(vocab_list)}
 filtered_text = ''.join([ch if ch in char_to_idx else ' ' for ch in text])
 data = torch.tensor([char_to_idx[c] for c in filtered_text], dtype=torch.long)
 
-hidden_size = 64
+hidden_size = 128
 num_layers = 1
 num_heads = 1
-seq_len = 32
+seq_len = 128
 epochs = 1000
 
 # === Model definition ===

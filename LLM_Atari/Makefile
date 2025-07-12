@@ -17,6 +17,10 @@ train:
 # === Predict: run interpreter with optional ARGS ===
 predict:
 	python $(PREDICT_SCRIPT) $(ARGS)
+	
+	
+full: train predict
+	
 
 # === Overfit: train tiny model and test it ===
 overfit:
