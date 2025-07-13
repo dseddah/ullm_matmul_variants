@@ -6,7 +6,9 @@ class TinyGPT(nn.Module):
         super().__init__()
         self.token_embedding = nn.Embedding(vocab_size, hidden_size)
         self.pos_embedding = nn.Embedding(seq_len, hidden_size)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads)
+#        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads, dropout=0.1)
+
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.lm_head = nn.Linear(hidden_size, vocab_size)
 
