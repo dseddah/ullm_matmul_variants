@@ -28,3 +28,11 @@ overfit:
 	python $(OVERFIT_SCRIPT) --model_name debug
 	@echo "🧠 Testing debug model with prompt 'the':"
 	python $(PREDICT_SCRIPT) --model_name debug --prompt "the " --k 1 --generate 100
+
+
+overfit_real:
+		@echo "🚧 Running overfit test from the main script (model: debug)..."
+		python $(TRAIN_SCRIPT) --model_name debug --epochs 2000 --train_file overfit_tiny.txt\
+		--val_file overfit_tiny.txt --model_name debug_overfit
+		@echo "🧠 Testing debug model with prompt 'the':"
+		python $(PREDICT_SCRIPT) --model_name debug_overfit --k 1 --prompt "the " --generate 100		
