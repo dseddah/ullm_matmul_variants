@@ -15,7 +15,7 @@ args = parser.parse_args()
 
 # === 2. Hyperparams (can move to args later) ===
 hidden_size = 128
-num_layers = 3
+num_layers = 1
 num_heads = 1
 seq_len = 128
 
