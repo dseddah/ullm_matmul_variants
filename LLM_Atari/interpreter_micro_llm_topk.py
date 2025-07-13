@@ -66,7 +66,9 @@ state_dict = model.state_dict()
 with open(weights_file, "rb") as f:
     for k in state_dict.keys():
         numel = state_dict[k].numel()
-        q = np.frombuffer(f.read(numel), dtype=np.int8).astype(np.float32) / 127.0
+        # disabling quanticization
+#        q = np.frombuffer(f.read(numel), dtype=np.int8).astype(np.float32) / 127.0
+        q = np.frombuffer(f.read(numel * 4), dtype=np.float32)  # float32 = 4 bytes
         state_dict[k] = torch.from_numpy(q.reshape(state_dict[k].shape))
 
 model.load_state_dict(state_dict)
