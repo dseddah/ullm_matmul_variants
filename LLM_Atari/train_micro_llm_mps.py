@@ -114,8 +114,9 @@ def quantize_tensor(tensor):
 weights_path = f"{model_name}_weights.bin"
 with open(weights_path, "wb") as f:
     for k, v in model.state_dict().items():
-        q = quantize_tensor(v.cpu().flatten())
-        q.numpy().tofile(f)
+        #q = quantize_tensor(v.cpu().flatten())
+        #q.numpy().tofile(f)
+        v.cpu().flatten().numpy().astype(np.float32).tofile(f)
 
 # === 7. Save config ===
 config = {

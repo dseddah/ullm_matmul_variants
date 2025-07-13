@@ -1,5 +1,5 @@
 # === File Paths ===
-TRAIN_SCRIPT = train_micro_llm.py
+TRAIN_SCRIPT = train_micro_llm_mps.py
 PREDICT_SCRIPT = interpreter_micro_llm_topk.py
 OVERFIT_SCRIPT = overfit_micro_llm.py
 WEIGHTS_FILE = tiny_llm_weights.bin
