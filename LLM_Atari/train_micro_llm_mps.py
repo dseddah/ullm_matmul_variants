@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import argparse
 import json
 import os
-
+import numpy as np #raaaaaaaaaaah
 # === 0. Argument parsing ===
 parser = argparse.ArgumentParser(description="Train Micro LLM on MPS with quantized export and config.")
 parser.add_argument("--model_name", type=str, default="tiny_llm", help="Base name for saved model files.")
