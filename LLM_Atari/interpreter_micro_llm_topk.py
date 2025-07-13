@@ -105,6 +105,7 @@ for step in range(num_generate):
             print("Start pos:", start_pos)
             print("Input seq:", ''.join(idx_to_char[i.item()] for i in input_seq.squeeze()))
             print("Logits max/min:", next_logits.max().item(), next_logits.min().item())
+            print("Logits (sample):", next_logits[:10].cpu().numpy())
 
         next_idx, top_indices, top_probs = top_k_sampling(next_logits, k=top_k)
 

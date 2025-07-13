@@ -1,3 +1,5 @@
+# train_micro_llm_mps.py
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -5,15 +7,8 @@ import argparse
 import json
 import os
 
-# ==== -1 initialize mps backend
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-model.to(device)
-tensor = tensor.to(device)
-
-
-
 # === 0. Argument parsing ===
-parser = argparse.ArgumentParser(description="Train Micro LLM with quantized export and config (with positional embeddings).")
+parser = argparse.ArgumentParser(description="Train Micro LLM on MPS with quantized export and config.")
 parser.add_argument("--model_name", type=str, default="tiny_llm", help="Base name for saved model files.")
 parser.add_argument("--train_file", type=str, default="train_tiny.txt", help="Training file (default: train_tiny.txt)")
 parser.add_argument("--val_file", type=str, default="val_tiny.txt", help="Validation file (default: val_tiny.txt)")
@@ -27,7 +22,10 @@ parser.add_argument("--debug", action="store_true", help="Enable debug output du
 parser.add_argument("--batch_size", type=int, default=4, help="Batch size (default: 4)")
 args = parser.parse_args()
 
-# === 1. Hyperparams ===
+# === 1. Hyperparams and device ===
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+print(f"🖥️  Using device: {device}")
+
 model_name = args.model_name
 hidden_size = args.hidden_size
 num_layers = args.num_layers
@@ -36,41 +34,25 @@ seq_len = args.seq_len
 epochs = args.epochs
 lr = args.lr
 batch_size = args.batch_size
-debug=args.debug
+debug = args.debug
 
-## === 2. Vocab ===   buggy
-#vocab_list = list("abcdefghijklmnopqrstuvwxyz .,!?")
-#vocab_size = len(vocab_list)
-#char_to_idx = {ch: i for i, ch in enumerate(vocab_list)}
-#idx_to_char = {i: ch for i, ch in enumerate(vocab_list)}
-
-
-
-# === 3. Load and clean data ===
+# === 2. Load and clean data ===
 def load_and_clean(path):
-    #doesn't clean yet
     with open(path, "r") as f:
         raw = f.read().lower()
     return raw
 
-
-
-
 train_text = load_and_clean(args.train_file)
 val_text = load_and_clean(args.val_file)
 
-# adding vocab from last working stuff
-
-# === 4. Vocab ===
+# === 3. Vocab ===
 vocab = sorted(set(train_text + val_text))
 vocab_size = len(vocab)
 char_to_idx = {ch: i for i, ch in enumerate(vocab)}
 idx_to_char = {i: ch for i, ch in enumerate(vocab)}
 
-
 def encode(text):
     return torch.tensor([char_to_idx.get(c, 0) for c in text], dtype=torch.long)
-
 
 train_data = encode(train_text)
 val_data = encode(val_text)
@@ -86,64 +68,43 @@ class TinyGPT(nn.Module):
         self.lm_head = nn.Linear(hidden_size, vocab_size)
 
     def forward(self, x):
-#        positions = torch.arange(0, x.size(0), device=x.device).unsqueeze(1)
-        positions = torch.arange(0, x.size(0), device=x.device).unsqueeze(1).expand(x.size(0), x.size(1))
+        seq_len_actual, batch_size = x.shape
+        positions = torch.arange(0, seq_len_actual, device=x.device).unsqueeze(1).expand(seq_len_actual, batch_size)
         x = self.token_embedding(x) + self.pos_embedding(positions)
         x = x * (hidden_size ** 0.5)
         x = self.transformer(x)
         return self.lm_head(x)
 
-model = TinyGPT()
+model = TinyGPT().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 # === 5. Training loop ===
-
-for epoch in range(args.epochs):
+for epoch in range(epochs):
     model.train()
 
-# that part was overfitting, commented to give space to #2
-#    input_seq = train_data[:seq_len].unsqueeze(1)
-#    target_seq = train_data[1:seq_len+1].unsqueeze(1)
-#   regular part
+    start_idx = torch.randint(0, len(train_data) - seq_len - 1, (batch_size,))
+    input_seq = torch.stack([train_data[i : i + seq_len] for i in start_idx]).transpose(0, 1)
+    target_seq = torch.stack([train_data[i + 1 : i + seq_len + 1] for i in start_idx]).transpose(0, 1)
 
+    input_seq = input_seq.to(device)
+    target_seq = target_seq.to(device)
 
-    if 0:   #2 (now commented
-        start_idx = torch.randint(0, len(train_data) - seq_len - 1, (1,)).item()
-        input_seq = train_data[start_idx : start_idx + seq_len].unsqueeze(1)
-        target_seq = train_data[start_idx + 1 : start_idx + seq_len + 1].unsqueeze(1)
-        optimizer.zero_grad()
-        output = model(input_seq)
-        loss = F.cross_entropy(output.view(-1, vocab_size), target_seq.view(-1))
-        loss.backward()
-        optimizer.step()
-    else:
-        # Random starting points for each sequence in the batch
-        start_idx = torch.randint(0, len(train_data) - seq_len - 1, (batch_size,))
-    
-        # Shape: [seq_len, batch_size]
-        input_seq = torch.stack([train_data[i : i + seq_len] for i in start_idx]).transpose(0, 1)
-        target_seq = torch.stack([train_data[i + 1 : i + seq_len + 1] for i in start_idx]).transpose(0, 1)
-    
-        optimizer.zero_grad()
-        output = model(input_seq)  # output shape: [seq_len, batch_size, vocab_size]
-        loss = F.cross_entropy(output.view(-1, vocab_size), target_seq.reshape(-1))
-        loss.backward()
-        optimizer.step()
-
+    optimizer.zero_grad()
+    output = model(input_seq)
+    loss = F.cross_entropy(output.view(-1, vocab_size), target_seq.reshape(-1))
+    loss.backward()
+    optimizer.step()
 
     if epoch % 50 == 0:
         print(f"Epoch {epoch}, Loss: {loss.item():.6f}")
         if debug:
-            for b in range(min(2, batch_size)):  # show first 1–2 samples
-                sample_input = ''.join(idx_to_char[i.item()] for i in input_seq[:, b])
-                sample_target = ''.join(idx_to_char[i.item()] for i in target_seq[:, b])
-#            sample_input = ''.join(idx_to_char[i.item()] for i in input_seq[:, 0])
-#             sample_target = ''.join(idx_to_char[i.item()] for i in target_seq[:, 0])
+            for b in range(min(2, batch_size)):
+                sample_input = ''.join(idx_to_char[i.item()] for i in input_seq[:, b].cpu())
+                sample_target = ''.join(idx_to_char[i.item()] for i in target_seq[:, b].cpu())
                 print(f"🧪 Input sample:  {sample_input}")
                 print(f"🎯 Target sample: {sample_target}")
                 print(f"🔍 Embedding[0]: {model.token_embedding.weight[0][:5].detach().cpu().numpy()}")
                 print()
-
 
 # === 6. Quantized export ===
 def quantize_tensor(tensor):
@@ -153,10 +114,8 @@ def quantize_tensor(tensor):
 weights_path = f"{model_name}_weights.bin"
 with open(weights_path, "wb") as f:
     for k, v in model.state_dict().items():
-# deactivating quanticization
-#        q = quantize_tensor(v.cpu().flatten())
-#        q.numpy().tofile(f)
-		v.cpu().flatten().numpy().astype(np.float32).tofile(f)
+        q = quantize_tensor(v.cpu().flatten())
+        q.numpy().tofile(f)
 
 # === 7. Save config ===
 config = {
