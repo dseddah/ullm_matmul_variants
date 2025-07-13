@@ -1,6 +1,6 @@
 # === File Paths ===
-TRAIN_SCRIPT = train_micro_llm_mps.py
-PREDICT_SCRIPT = interpreter_micro_llm_topk.py
+TRAIN_SCRIPT = modularized/train_micro_llm_mps.py
+PREDICT_SCRIPT = modularized/interpreter_micro_llm_topk.py
 OVERFIT_SCRIPT = overfit_micro_llm.py
 WEIGHTS_FILE = tiny_llm_weights.bin
 CONFIG_FILE = tiny_llm_config.json
@@ -32,7 +32,7 @@ overfit:
 
 overfit_real:
 		@echo "🚧 Running overfit test from the main script (model: debug)..."
-		python $(TRAIN_SCRIPT) --model_name debug --epochs 1000 --train_file overfit_tiny.txt\
+		python $(TRAIN_SCRIPT) --model_name debug --epochs 1000 --train_file overfit_tiny_2.txt\
 		--val_file overfit_tiny_2.txt --model_name debug_overfit $(ARGS)
 		@echo "🧠 Testing debug model with prompt 'the':"
 		python $(PREDICT_SCRIPT) --model_name debug_overfit --k 1 --prompt "the " --generate 100	

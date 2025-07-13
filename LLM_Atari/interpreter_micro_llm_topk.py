@@ -72,8 +72,17 @@ with open(weights_file, "rb") as f:
         q = np.frombuffer(f.read(numel * 4), dtype=np.float32)  # float32 = 4 bytes
         state_dict[k] = torch.from_numpy(q.reshape(state_dict[k].shape))
 
+
+
 model.load_state_dict(state_dict)
 model.eval()
+
+if 0:
+    print("\n🧩 State dict keys (train):")
+    for k in model.state_dict().keys():
+        print(" -", k)
+
+
 
 print(f"✅ Loaded model: {model_name}")
 print(f"📚 Prompt: '{prompt}' | 🧠 top-k: {top_k} | ✏️ generate: {num_generate} tokens")
@@ -102,6 +111,15 @@ for step in range(num_generate):
     with torch.no_grad():
         logits = model(input_seq, start_pos=start_pos)
         next_logits = logits[-1, 0, :]
+        if 0:
+                    # === Softmax Debug ===
+            probs = torch.softmax(next_logits, dim=-1)
+            print("\n📊 Sampled softmax probs (top 10):")
+            top_vals, top_idxs = torch.topk(probs, 10)
+            for i in range(10):
+                print(f"  {idx_to_char[top_idxs[i].item()]}: {top_vals[i].item():.4f}")
+        
+        
 
         if debug:
             print(f"\n--- Step {step} ---")

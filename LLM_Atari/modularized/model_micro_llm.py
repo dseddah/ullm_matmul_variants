@@ -10,7 +10,7 @@ class TinyGPT(nn.Module):
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.lm_head = nn.Linear(hidden_size, vocab_size)
 
-    def forward(self, x):
+    def forward(self, x, start_pos=0):
         seq_len_actual, batch_size = x.shape
         positions = torch.arange(0, seq_len_actual, device=x.device).unsqueeze(1).expand(seq_len_actual, batch_size)
         x = self.token_embedding(x) + self.pos_embedding(positions)

@@ -24,7 +24,7 @@ args = parser.parse_args()
 
 # === 1. Hyperparams and device ===
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-print(f"🖥️  Using device: {device}")
+print(f"ЁЯЦея╕П  Using device: {device}")
 
 model_name = args.model_name
 hidden_size = args.hidden_size
@@ -101,15 +101,24 @@ for epoch in range(epochs):
             for b in range(min(2, batch_size)):
                 sample_input = ''.join(idx_to_char[i.item()] for i in input_seq[:, b].cpu())
                 sample_target = ''.join(idx_to_char[i.item()] for i in target_seq[:, b].cpu())
-                print(f"🧪 Input sample:  {sample_input}")
-                print(f"🎯 Target sample: {sample_target}")
-                print(f"🔍 Embedding[0]: {model.token_embedding.weight[0][:5].detach().cpu().numpy()}")
+                print(f"ЁЯзк Input sample:  {sample_input}")
+                print(f"ЁЯОп Target sample: {sample_target}")
+                print(f"ЁЯФН Embedding[0]: {model.token_embedding.weight[0][:5].detach().cpu().numpy()}")
                 print()
 
 # === 6. Quantized export ===
 def quantize_tensor(tensor):
     tensor = tensor.clamp(-1, 1)
     return (tensor * 127).round().clamp(-128, 127).to(torch.int8)
+
+
+# print state dict debugging info
+if 0:
+    print("\n🧩 State dict keys (train):")
+    for k in model.state_dict().keys():
+        print(" -", k)
+
+
 
 weights_path = f"{model_name}_weights.bin"
 with open(weights_path, "wb") as f:
@@ -140,8 +149,8 @@ param_count = sum(p.numel() for p in model.parameters())
 param_size_bytes = param_count
 param_size_mb = param_size_bytes / (1024 * 1024)
 
-print(f"\n✅ Training complete: {model_name}")
-print(f"📦 Saved weights to {weights_path}")
-print(f"🧠 Config written to {config_path}")
-print(f"📊 Parameters: {param_count:,}")
-print(f"📦 Model size: {param_size_bytes:,} bytes ({param_size_mb:.4f} MB)")
+print(f"\nтЬЕ Training complete: {model_name}")
+print(f"ЁЯУж Saved weights to {weights_path}")
+print(f"ЁЯза Config written to {config_path}")
+print(f"ЁЯУК Parameters: {param_count:,}")
+print(f"ЁЯУж Model size: {param_size_bytes:,} bytes ({param_size_mb:.4f} MB)")

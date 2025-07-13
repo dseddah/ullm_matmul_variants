@@ -6,7 +6,9 @@ import argparse
 import json
 import os
 import numpy as np
- 
+from model_micro_llm import TinyGPT  # or SanityLM
+
+
 # === 0. CLI arguments ===
 parser = argparse.ArgumentParser(description="Micro LLM Top-k Sampler with positional generation.")
 parser.add_argument("--k", type=int, default=1, help="Top-k sampling value (default: 1)")
@@ -44,23 +46,11 @@ char_to_idx = {ch: i for i, ch in enumerate(vocab_list)}
 idx_to_char = {i: ch for i, ch in enumerate(vocab_list)}
 
 # === 2. Model definition ===
-class TinyGPT(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.token_embedding = nn.Embedding(vocab_size, hidden_size)
-        self.pos_embedding = nn.Embedding(seq_len, hidden_size)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads)
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.lm_head = nn.Linear(hidden_size, vocab_size)
 
-    def forward(self, x, start_pos=0):
-        positions = torch.arange(start_pos, start_pos + x.size(0), device=x.device).unsqueeze(1) % seq_len
-        x = self.token_embedding(x) + self.pos_embedding(positions)
-        x = x * (hidden_size ** 0.5)
-        x = self.transformer(x)
-        return self.lm_head(x)
+# now in model_micro_llm
 
-model = TinyGPT()
+#model = TinyGPT()
+model = TinyGPT(vocab_size, hidden_size, seq_len, num_layers, num_heads)
 
 # === 3. Load quantized weights ===
 state_dict = model.state_dict()

@@ -7,6 +7,11 @@ import argparse
 import json
 import os
 import numpy as np #raaaaaaaaaaah
+from model_micro_llm import TinyGPT  # or SanityLM
+
+
+
+
 # === 0. Argument parsing ===
 parser = argparse.ArgumentParser(description="Train Micro LLM on MPS with quantized export and config.")
 parser.add_argument("--model_name", type=str, default="tiny_llm", help="Base name for saved model files.")
@@ -58,24 +63,12 @@ train_data = encode(train_text)
 val_data = encode(val_text)
 
 # === 4. Model ===
-class TinyGPT(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.token_embedding = nn.Embedding(vocab_size, hidden_size)
-        self.pos_embedding = nn.Embedding(seq_len, hidden_size)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads)
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.lm_head = nn.Linear(hidden_size, vocab_size)
+# now defined in micro_LM_model
 
-    def forward(self, x):
-        seq_len_actual, batch_size = x.shape
-        positions = torch.arange(0, seq_len_actual, device=x.device).unsqueeze(1).expand(seq_len_actual, batch_size)
-        x = self.token_embedding(x) + self.pos_embedding(positions)
-        x = x * (hidden_size ** 0.5)
-        x = self.transformer(x)
-        return self.lm_head(x)
 
-model = TinyGPT().to(device)
+#model = TinyGPT().to(device)
+model = TinyGPT(vocab_size, hidden_size, seq_len, num_layers, num_heads).to(device)
+
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 # === 5. Training loop ===
