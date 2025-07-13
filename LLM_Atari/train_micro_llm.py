@@ -27,7 +27,7 @@ seq_len = args.seq_len
 epochs = args.epochs
 lr = args.lr
 
-## === 2. Vocab ===   buggy
+## === 2. Vocab ===	  buggy
 #vocab_list = list("abcdefghijklmnopqrstuvwxyz .,!?")
 #vocab_size = len(vocab_list)
 #char_to_idx = {ch: i for i, ch in enumerate(vocab_list)}
@@ -38,9 +38,9 @@ lr = args.lr
 # === 3. Load and clean data ===
 def load_and_clean(path):
 	#doesn't clean yet
-    with open(path, "r") as f:
-        raw = f.read().lower()
-    return raw
+	with open(path, "r") as f:
+		raw = f.read().lower()
+	return raw
 
 
 
@@ -58,7 +58,7 @@ idx_to_char = {i: ch for i, ch in enumerate(vocab)}
 
 
 def encode(text):
-    return torch.tensor([char_to_idx.get(c, 0) for c in text], dtype=torch.long)
+	return torch.tensor([char_to_idx.get(c, 0) for c in text], dtype=torch.long)
 
 
 train_data = encode(train_text)
@@ -66,72 +66,67 @@ val_data = encode(val_text)
 
 # === 4. Model ===
 class TinyGPT(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.token_embedding = nn.Embedding(vocab_size, hidden_size)
-        self.pos_embedding = nn.Embedding(seq_len, hidden_size)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads)
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.lm_head = nn.Linear(hidden_size, vocab_size)
+	def __init__(self):
+		super().__init__()
+		self.token_embedding = nn.Embedding(vocab_size, hidden_size)
+		self.pos_embedding = nn.Embedding(seq_len, hidden_size)
+		encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=num_heads)
+		self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+		self.lm_head = nn.Linear(hidden_size, vocab_size)
 
-    def forward(self, x):
-        positions = torch.arange(0, x.size(0), device=x.device).unsqueeze(1)
-        x = self.token_embedding(x) + self.pos_embedding(positions)
-        x = x * (hidden_size ** 0.5)
-        x = self.transformer(x)
-        return self.lm_head(x)
+	def forward(self, x):
+		positions = torch.arange(0, x.size(0), device=x.device).unsqueeze(1)
+		x = self.token_embedding(x) + self.pos_embedding(positions)
+		x = x * (hidden_size ** 0.5)
+		x = self.transformer(x)
+		return self.lm_head(x)
 
 model = TinyGPT()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 # === 5. Training loop ===
-batch_size = 1
-for epoch in range(epochs):
-    idx = torch.randint(0, len(train_data) - seq_len - 1, (batch_size,))
-    seq = torch.stack([train_data[i:i+seq_len] for i in idx]).transpose(0,1)
-    target = torch.stack([train_data[i+1:i+seq_len+1] for i in idx]).transpose(0,1)
+
+for epoch in range(args.epochs):
+    model.train()
+    input_seq = train_data[:seq_len].unsqueeze(1)
+    target_seq = train_data[1:seq_len+1].unsqueeze(1)
 
     optimizer.zero_grad()
-    output = model(seq)
-    loss = F.cross_entropy(output.view(-1, vocab_size), target.reshape(-1))
+    output = model(input_seq)
+    loss = F.cross_entropy(output.view(-1, vocab_size), target_seq.view(-1))
     loss.backward()
     optimizer.step()
 
     if epoch % 50 == 0:
-        with torch.no_grad():
-            val_idx = torch.randint(0, len(val_data) - seq_len - 1, (batch_size,))
-            val_seq = torch.stack([val_data[i:i+seq_len] for i in val_idx]).transpose(0,1)
-            val_target = torch.stack([val_data[i+1:i+seq_len+1] for i in val_idx]).transpose(0,1)
-            val_output = model(val_seq)
-            val_loss = F.cross_entropy(val_output.view(-1, vocab_size), val_target.reshape(-1))
-        print(f"Epoch {epoch}, Train Loss: {loss.item():.6f}, Val Loss: {val_loss.item():.6f}")
+        print(f"Epoch {epoch}, Loss: {loss.item():.6f}")
+
 
 # === 6. Quantized export ===
 def quantize_tensor(tensor):
-    tensor = tensor.clamp(-1, 1)
-    return (tensor * 127).round().clamp(-128, 127).to(torch.int8)
+	tensor = tensor.clamp(-1, 1)
+	return (tensor * 127).round().clamp(-128, 127).to(torch.int8)
 
 weights_path = f"{model_name}_weights.bin"
 with open(weights_path, "wb") as f:
-    for k, v in model.state_dict().items():
-        q = quantize_tensor(v.cpu().flatten())
-        q.numpy().tofile(f)
+	for k, v in model.state_dict().items():
+		q = quantize_tensor(v.cpu().flatten())
+		q.numpy().tofile(f)
 
 # === 7. Save config ===
 config = {
-    "hidden_size": hidden_size,
-    "num_layers": num_layers,
-    "num_heads": num_heads,
-    "seq_len": seq_len,
-    "vocab_list": vocab,
-    "vocab_size": vocab_size,
-    "train_file": args.train_file,
-    "val_file": args.val_file,
-    "learning_rate": lr
+	"hidden_size": hidden_size,
+	"num_layers": num_layers,
+	"num_heads": num_heads,
+	"seq_len": seq_len,
+	"vocab_list": vocab,
+	"vocab_size": vocab_size,
+	"train_file": args.train_file,
+	"val_file": args.val_file,
+	"learning_rate": lr
 }
 config_path = f"{model_name}_config.json"
 with open(config_path, "w") as f:
-    json.dump(config, f, indent=2)
+	json.dump(config, f, indent=2)
 
 # === 8. Stats ===
 param_count = sum(p.numel() for p in model.parameters())

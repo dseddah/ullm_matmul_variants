@@ -32,14 +32,14 @@ overfit:
 
 overfit_real:
 		@echo "🚧 Running overfit test from the main script (model: debug)..."
-		python $(TRAIN_SCRIPT) --model_name debug --epochs 2000 --train_file overfit_tiny.txt\
-		--val_file overfit_tiny_2.txt --model_name debug_overfit
+		python $(TRAIN_SCRIPT) --model_name debug --epochs 1000 --train_file overfit_tiny.txt\
+		--val_file overfit_tiny_2.txt --model_name debug_overfit $(ARGS)
 		@echo "🧠 Testing debug model with prompt 'the':"
 		python $(PREDICT_SCRIPT) --model_name debug_overfit --k 1 --prompt "the " --generate 100	
 		
 overfit_real_old:
 		@echo "🚧 Running overfit test from the main script (model: debug)..."
-		python $(TRAIN_SCRIPT).old  --epochs 2000 --train_file overfit_tiny.txt\
-		--val_file overfit_tiny_2.txt --model_name debug_overfit_old
+		python $(TRAIN_SCRIPT).old  --epochs 1000 --train_file overfit_tiny.txt\
+		--val_file overfit_tiny_2.txt --model_name debug_overfit_old $(ARGS)
 		@echo "🧠 Testing debug model with prompt 'the':"
 		python $(PREDICT_SCRIPT) --model_name debug_overfit_old --k 1 --prompt "the " --generate 100	
