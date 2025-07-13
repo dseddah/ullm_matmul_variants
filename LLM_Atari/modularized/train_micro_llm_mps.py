@@ -75,15 +75,28 @@ optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 for epoch in range(epochs):
     model.train()
 
-    start_idx = torch.randint(0, len(train_data) - seq_len - 1, (batch_size,))
-    input_seq = torch.stack([train_data[i : i + seq_len] for i in start_idx]).transpose(0, 1)
-    target_seq = torch.stack([train_data[i + 1 : i + seq_len + 1] for i in start_idx]).transpose(0, 1)
+#    
+    if 0:
+        start_idx = torch.randint(0, len(train_data) - seq_len - 1, (batch_size,))
+        input_seq = torch.stack([train_data[i : i + seq_len] for i in start_idx]).transpose(0, 1)
+        target_seq = torch.stack([train_data[i + 1 : i + seq_len + 1] for i in start_idx]).transpose(0, 1)
+    else:
+#        input_seq = train_data[:seq_len].unsqueeze(1)
+#        target_seq = train_data[1:seq_len+1].unsqueeze(1)
+# === Force overfitting on a fixed slice ===
+# Make sure we have enough characters
+        min_len = min(len(train_data), seq_len)
 
+        input_seq = train_data[:min_len - 1].unsqueeze(1).to(device)
+        target_seq = train_data[1:min_len].unsqueeze(1).to(device)     
+        
     input_seq = input_seq.to(device)
     target_seq = target_seq.to(device)
 
     optimizer.zero_grad()
     output = model(input_seq)
+#    print("🟩 output.shape:", output.shape)
+#    print("🟦 target_seq.shape:", target_seq.shape)
     loss = F.cross_entropy(output.view(-1, vocab_size), target_seq.reshape(-1))
     loss.backward()
     optimizer.step()
@@ -94,9 +107,9 @@ for epoch in range(epochs):
             for b in range(min(2, batch_size)):
                 sample_input = ''.join(idx_to_char[i.item()] for i in input_seq[:, b].cpu())
                 sample_target = ''.join(idx_to_char[i.item()] for i in target_seq[:, b].cpu())
-                print(f"ЁЯзк Input sample:  {sample_input}")
-                print(f"ЁЯОп Target sample: {sample_target}")
-                print(f"ЁЯФН Embedding[0]: {model.token_embedding.weight[0][:5].detach().cpu().numpy()}")
+                print(f"Input sample:  {sample_input}")
+                print(f"Target sample: {sample_target}")
+                print(f"Embedding[0]: {model.token_embedding.weight[0][:5].detach().cpu().numpy()}")
                 print()
 
 # === 6. Quantized export ===

@@ -16,6 +16,7 @@ parser.add_argument("--prompt", type=str, default="the ", help="Prompt for gener
 parser.add_argument("--generate", type=int, default=200, help="Number of characters to generate (default: 200)")
 parser.add_argument("--model_name", type=str, default="tiny_llm", help="Base name of model (default: tiny_llm)")
 parser.add_argument("--debug", action="store_true", help="Enable debug output during generation")
+parser.add_argument("--debug_softmax", action="store_true", help="Enable debug output during generation")
 args = parser.parse_args()
 
 top_k = args.k
@@ -23,6 +24,7 @@ prompt = args.prompt
 num_generate = args.generate
 model_name = args.model_name
 debug = args.debug
+debug_softmax = args.debug_softmax
 
 # === 1. Load config and vocab ===
 config_file = f"{model_name}_config.json"
@@ -101,7 +103,9 @@ for step in range(num_generate):
     with torch.no_grad():
         logits = model(input_seq, start_pos=start_pos)
         next_logits = logits[-1, 0, :]
-        if 0:
+        temperature = 1.2  # try 0.8, 1.2, etc.
+        next_logits = next_logits / temperature
+        if debug_softmax:
                     # === Softmax Debug ===
             probs = torch.softmax(next_logits, dim=-1)
             print("\n📊 Sampled softmax probs (top 10):")
