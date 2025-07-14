@@ -79,7 +79,7 @@ for epoch in range(epochs):
     if 0:
         start_idx = torch.randint(0, len(train_data) - seq_len - 1, (batch_size,))
         input_seq = torch.stack([train_data[i : i + seq_len] for i in start_idx]).transpose(0, 1)
-        target_seq = torch.stack([train_data[i  : i + seq_len + 1] for i in start_idx]).transpose(0, 1)
+        target_seq = torch.stack([train_data[i +1 : i + seq_len + 1] for i in start_idx]).transpose(0, 1)
     else:
 #        input_seq = train_data[:seq_len].unsqueeze(1)
 #        target_seq = train_data[1:seq_len+1].unsqueeze(1)
@@ -95,8 +95,8 @@ for epoch in range(epochs):
 
     optimizer.zero_grad()
     output = model(input_seq)
-#    print("🟩 output.shape:", output.shape)
-#    print("🟦 target_seq.shape:", target_seq.shape)
+    print("🟩 output.shape:", output.shape)
+    print("🟦 target_seq.shape:", target_seq.shape)
     loss = F.cross_entropy(output.view(-1, vocab_size), target_seq.reshape(-1))
     loss.backward()
     optimizer.step()

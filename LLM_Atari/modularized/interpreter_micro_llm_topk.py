@@ -16,7 +16,8 @@ parser.add_argument("--generate", type=int, default=200, help="Number of charact
 parser.add_argument("--model_name", type=str, default="tiny_llm", help="Base name of model files")
 parser.add_argument("--debug", action="store_true", help="Print logits/debug info per step")
 parser.add_argument("--debug_softmax", action="store_true", help="Print top softmax probabilities")
-args = parser.parse_args()
+#args = parser.parse_args()
+args, _ = parser.parse_known_args()  # ✅ safely ignores them
 
 # === Load model config ===
 config_path = f"{args.model_name}_config.json"
@@ -79,7 +80,11 @@ def sample_token(logits, k=0, p=0.0, temperature=1.0):
 
     probs = F.softmax(logits, dim=-1)
     sampled_idx = torch.multinomial(probs, 1).item()
-    top_probs, top_indices = torch.topk(probs, 10)
+    
+
+    #top_probs, top_indices = torch.topk(probs, 10)   # replaced with the next 2 lines
+    top_k_limit = min(10, probs.size(0))
+    top_probs, top_indices = torch.topk(probs, top_k_limit)
     return sampled_idx, top_probs, top_indices
 
 # === Encode prompt ===
